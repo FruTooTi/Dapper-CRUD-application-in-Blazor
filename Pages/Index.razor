@@ -1,0 +1,127 @@
+﻿@page "/"
+@using DapperCRUD.Data;
+@inject ServerConnection serverConnection
+@inject ICustomerService customerService
+@inject IBooksService booksService
+@inject IJSRuntime _IJsRuntime
+
+<PageTitle>Index</PageTitle>
+@*Customer List*@
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Customer Name</th>
+            <th>Customer Book</th>
+            <th>Date Borrowed</th>
+            <th>Estimated Arrival</th>
+            <th>Edit/Delete</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach(var customer in CustomerList)
+        {
+            <tr>
+                <td>@customer.Name</td>
+                <td>@customer.BookBorrowed.BookName</td>
+                <td>@customer.DateTaken.Value.ToString("dddd, dd MMMM yy")</td>
+                <td>@customer.DateToBeReceived.Value.ToString("dddd, dd MMMM yy")</td>
+                <td><button type="button" @onclick=@(() => GetCustomer(@customer.CustomerId)) class="btn btn-success">Edit</button>
+                    <button type="button" @onclick=@(() => DeleteCustomer(@customer.CustomerId)) class="btn btn-danger">Delete</button></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+
+@*Add Form*@
+<button type="button" @onclick="ToggleAdd" class="btn btn-primary">Hide/Show Add</button>
+
+<div id="add" style="display:none;">
+<h3 class="text text-primary">Add Customer</h3>
+<EditForm Model=newCustomer OnValidSubmit="SubmitForm">
+    <div class="form-group">
+        <label for="name">Name:</label>
+        <InputText @bind-Value=newCustomer.Name id="name" class="form-control"></InputText>
+
+        <label for="books">Book:</label>
+        <InputSelect @bind-Value=newCustomer.BookId id="books" class="form-control">
+            @foreach(var book in AllBooks)
+                {
+                    <option value=@book.Id>@book.BookName</option>
+                }
+        </InputSelect>
+
+        <label for="datetaken">Date Taken:</label>
+        <InputDate class="form-control" id="datetaken" @bind-Value=newCustomer.DateTaken ></InputDate>
+
+        <label for="dateretreived">Date to Return:</label>
+        <InputDate class="form-control" id="dateretreived" @bind-Value=newCustomer.DateToBeReceived></InputDate>
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </div>
+</EditForm>
+</div>
+
+@code{
+    Customer newCustomer = new Customer()
+        {
+            BookId = 0,
+            DateTaken = DateTime.Now
+    };
+    public List<Books> AllBooks = new List<Books>();
+    public List<Customer> CustomerList = new List<Customer>();
+    public bool Addvisible { get; set; } = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AllBooks = await booksService.ListBooks();
+        CustomerList = await customerService.ListCustomer();
+    }
+
+    public async Task SubmitForm()
+    {
+        if(newCustomer.CustomerId == 0)
+            await customerService.AddCustomer(newCustomer);
+        else
+        {
+            await customerService.UpdateCustomer(newCustomer);
+        }
+        CustomerList = await customerService.ListCustomer();
+        newCustomer = new Customer()
+            {
+                BookId = 0,
+                DateTaken = DateTime.Now
+            };
+    }
+
+    public async Task GetCustomer(int customerId)
+    {
+        Customer targetCustomer;
+        targetCustomer = await customerService.GetCustomer(customerId);
+
+        newCustomer.CustomerId = targetCustomer.CustomerId;
+        newCustomer.Name = targetCustomer.Name;
+        newCustomer.BookId = targetCustomer.BookId;
+        newCustomer.DateTaken = targetCustomer.DateTaken;
+        newCustomer.DateToBeReceived = targetCustomer.DateToBeReceived;
+
+        if(Addvisible == false)
+        {
+            await ToggleAdd();
+        }
+    }
+
+    public async Task ToggleAdd()
+    {
+        await _IJsRuntime.InvokeVoidAsync("displayAdd", Addvisible);
+        if (Addvisible == true)
+            Addvisible = false;
+        else
+            Addvisible = true;
+    }
+
+    public async Task DeleteCustomer(int customerId)
+    {
+        await customerService.DeleteCustomer(customerId);
+        CustomerList = await customerService.ListCustomer();
+    }
+}
